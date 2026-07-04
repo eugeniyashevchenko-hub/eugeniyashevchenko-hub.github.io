@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Оплаты">
+<title>Оплаты 2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #F2F2F7; color: #1C1C1E; min-height: 100vh; }
+  .header { background: #fff; padding: 16px 16px 12px; border-bottom: 0.5px solid #C6C6C8; position: sticky; top: 0; z-index: 10; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #1C1C1E; }
+  .header p { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+  .month-row { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: #fff; border-bottom: 0.5px solid #C6C6C8; scrollbar-width: none; }
+  .month-row::-webkit-scrollbar { display: none; }
+  .mbtn { flex-shrink: 0; padding: 7px 16px; border-radius: 20px; border: 1px solid #C6C6C8; background: #fff; color: #3C3C43; font-size: 15px; cursor: pointer; white-space: nowrap; font-family: inherit; }
+  .mbtn.active { background: #007AFF; border-color: #007AFF; color: #fff; font-weight: 600; }
+  .content { padding: 16px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat { background: #fff; border-radius: 12px; padding: 12px 14px; }
+  .stat-lbl { font-size: 12px; color: #8E8E93; margin-bottom: 4px; }
+  .stat-val { font-size: 18px; font-weight: 600; color: #1C1C1E; }
+  .stat-val.ok { color: #34C759; }
+  .stat-val.bad { color: #FF3B30; }
+  .section-title { font-size: 13px; font-weight: 600; color: #8E8E93; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; padding-left: 4px; }
+  .prop-block { background: #fff; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .prop-hdr { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 0.5px solid #E5E5EA; cursor: pointer; user-select: none; }
+  .prop-name { font-size: 15px; font-weight: 600; color: #1C1C1E; display: flex; align-items: center; gap: 8px; }
+  .prop-icon { font-size: 20px; }
+  .prop-right { display: flex; align-items: center; gap: 8px; }
+  .prop-total { font-size: 14px; color: #8E8E93; }
+  .chevron { font-size: 12px; color: #C7C7CC; transition: transform 0.2s; }
+  .chevron.open { transform: rotate(180deg); }
+  .pay-rows { display: none; }
+  .pay-rows.open { display: block; }
+  .pay-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 0.5px solid #E5E5EA; gap: 12px; }
+  .pay-row:last-child { border-bottom: none; }
+  .check { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #C7C7CC; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all 0.15s; }
+  .check.paid { background: #34C759; border-color: #34C759; }
+  .check-icon { width: 14px; height: 14px; display: none; }
+  .check.paid .check-icon { display: block; }
+  .pay-info { flex: 1; min-width: 0; }
+  .pay-name { font-size: 15px; color: #1C1C1E; }
+  .pay-due { font-size: 12px; color: #FF9500; margin-top: 2px; }
+  .pay-due.over { color: #FF3B30; }
+  .amt-wrap { display: flex; align-items: center; gap: 4px; }
+  .amt-input { width: 90px; font-size: 15px; font-weight: 500; text-align: right; border: none; background: transparent; color: #1C1C1E; outline: none; padding: 6px 8px; border-radius: 8px; font-family: inherit; }
+  .amt-input:focus { background: #F2F2F7; }
+  .amt-input.unpaid { color: #FF3B30; }
+  .amt-input.paid-amt { color: #34C759; }
+  .rub { font-size: 14px; color: #8E8E93; }
+  .sync-bar { background: #fff; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .sync-info { flex: 1; font-size: 13px; color: #8E8E93; }
+  .sync-info.ok { color: #34C759; }
+  .sync-info.err { color: #FF3B30; }
+  .sync-btn { background: #007AFF; color: #fff; border: none; padding: 9px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
+  .sync-btn:active { opacity: 0.75; }
+  .sync-btn:disabled { opacity: 0.5; }
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1C1C1E; color: #fff; padding: 12px 20px; border-radius: 20px; font-size: 14px; white-space: nowrap; z-index: 999; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+  .toast.show { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinning { display: inline-block; animation: spin 1s linear infinite; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Оплаты 2026</h1>
+  <p id="last-saved">Нажмите «Сохранить» после изменений</p>
+</div>
+
+<div class="month-row" id="months"></div>
+
+<div class="content">
+  <div class="sync-bar">
+    <div class="sync-info" id="sync-info">Google Sheets подключён</div>
+    <button class="sync-btn" id="sync-btn" onclick="syncToSheets()">Сохранить</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="section-title">Объекты</div>
+  <div id="props"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwEOC2460TY0MOrdAx-se74awjx4xfiu8taIdHEdPf_zB8yq2Ze8Y2qdG2DMXN4q5nw/exec";
+const SHEET_ID = "1bqmv6K2jbAfy6SjY6CYtZ6KOs7D1zU_jJZfYE6HhpKA";
+const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const PROPS = ["Железноводск — квартира","Краснодар — квартира","Анапа — кв. 5","Анапа — кв. 4","Анапа — машиноместо"];
+const ICONS = ["🏠","🏢","🌊","🌊","🚗"];
+const TEMPLATE = {
+  "Железноводск — квартира":["Газ","Вода","ТКО","Коммуналка","Свет","Интернет / ТВ"],
+  "Краснодар — квартира":["Коммуналка","Кап. ремонт","ТВ"],
+  "Анапа — кв. 5":["Газ","Свет","Интернет","Коммуналка","Кап. ремонт","НТВ плюс","Гараж №6"],
+  "Анапа — кв. 4":["Газ","Свет","Коммуналка","НТВ плюс","Гараж №4","Кап. ремонт"],
+  "Анапа — машиноместо":["Машиноместо"]
+};
+const JULY = {
+  "Железноводск — квартира":[{n:"Газ",a:591.60,p:true},{n:"Вода",a:3900,p:true},{n:"ТКО",a:200.31,p:false,due:"15.07",over:true},{n:"Коммуналка",a:1326.34,p:true},{n:"Свет",a:2406.90,p:true},{n:"Интернет / ТВ",a:700,p:true}],
+  "Краснодар — квартира":[{n:"Коммуналка",a:4371.59,p:true},{n:"Кап. ремонт",a:1016.58,p:true},{n:"ТВ",a:439,p:true}],
+  "Анапа — кв. 5":[{n:"Газ",a:643.08,p:true},{n:"Свет",a:2203.65,p:true},{n:"Интернет",a:790,p:true},{n:"Коммуналка",a:4575.05,p:false,due:"15.07"},{n:"Кап. ремонт",a:1371.41,p:false,due:"15.07"},{n:"НТВ плюс",a:1200,p:true},{n:"Гараж №6",a:287.62,p:false,due:"15.07"}],
+  "Анапа — кв. 4":[{n:"Газ",a:633.76,p:true},{n:"Свет",a:873.99,p:true},{n:"Коммуналка",a:1901.04,p:false,due:"15.07"},{n:"НТВ плюс",a:200,p:true},{n:"Гараж №4",a:281.13,p:false,due:"15.07"},{n:"Кап. ремонт",a:904.77,p:false,due:"15.07"}],
+  "Анапа — машиноместо":[{n:"Машиноместо",a:900,p:false,due:"15.07"}]
+};
+
+let state = {}, currentMonth = "Июль", openProps = new Set(PROPS);
+
+function initState() {
+  const saved = localStorage.getItem("payments2026");
+  if (saved) {
+    try { state = JSON.parse(saved); return; } catch(e) {}
+  }
+  MONTHS.forEach(m => {
+    state[m] = {};
+    PROPS.forEach(prop => {
+      if (m === "Июль" && JULY[prop]) state[m][prop] = JULY[prop].map(d => ({n:d.n,a:d.a,p:d.p,due:d.due||"",over:d.over||false}));
+      else state[m][prop] = TEMPLATE[prop].map(n => ({n,a:0,p:false,due:"",over:false}));
+    });
+  });
+}
+
+function saveLocal() {
+  localStorage.setItem("payments2026", JSON.stringify(state));
+}
+
+function fmt(n) { return (n||0).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast show";
+  setTimeout(() => t.className = "toast", 3500);
+}
+
+async function syncToSheets() {
+  const btn = document.getElementById("sync-btn");
+  const info = document.getElementById("sync-info");
+  btn.disabled = true;
+  btn.textContent = "Сохранение...";
+  info.className = "sync-info";
+  info.textContent = "Отправка данных...";
+
+  const rows = [];
+  MONTHS.forEach(m => {
+    PROPS.forEach(prop => {
+      (state[m][prop]||[]).forEach(pay => {
+        if ((pay.a||0) > 0 || pay.p) rows.push({month:m,property:prop,name:pay.n,amount:pay.a||0,paid:pay.p,due:pay.due||""});
+      });
+    });
+  });
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: "POST", mode: "no-cors",
+      headers: {"Content-Type":"text/plain"},
+      body: JSON.stringify({action:"save", rows})
+    });
+    const now = new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+    info.className = "sync-info ok";
+    info.textContent = "Сохранено в " + now;
+    document.getElementById("last-saved").textContent = "Последнее сохранение: " + now;
+    showToast("Данные сохранены в таблицу");
+    btn.textContent = "Открыть таблицу";
+    btn.disabled = false;
+    btn.onclick = () => window.open("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit", "_blank");
+  } catch(e) {
+    info.className = "sync-info err";
+    info.textContent = "Ошибка. Данные сохранены на телефоне.";
+    showToast("Нет соединения — данные сохранены локально");
+    btn.textContent = "Сохранить";
+    btn.disabled = false;
+    btn.onclick = syncToSheets;
+  }
+  saveLocal();
+}
+
+function togglePay(month, prop, idx) {
+  state[month][prop][idx].p = !state[month][prop][idx].p;
+  saveLocal();
+  render();
+}
+
+function updateAmount(month, prop, idx, val) {
+  state[month][prop][idx].a = parseFloat(String(val).replace(",",".")) || 0;
+  saveLocal();
+  updateStats();
+}
+
+function toggleProp(prop) {
+  if (openProps.has(prop)) openProps.delete(prop);
+  else openProps.add(prop);
+  render();
+}
+
+function updateStats() {
+  let total = 0, paid = 0, unpaidCount = 0;
+  PROPS.forEach(prop => {
+    (state[currentMonth][prop]||[]).forEach(pay => {
+      total += pay.a||0;
+      if (pay.p) paid += pay.a||0;
+      else if ((pay.a||0) > 0) unpaidCount++;
+    });
+  });
+  const unpaid = total - paid;
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="stat-lbl">Всего за месяц</div><div class="stat-val">${fmt(total)} ₽</div></div>
+    <div class="stat"><div class="stat-lbl">Оплачено</div><div class="stat-val ok">${fmt(paid)} ₽</div></div>
+    <div class="stat"><div class="stat-lbl">Осталось</div><div class="stat-val ${unpaid>0?"bad":"ok"}">${unpaidCount>0?fmt(unpaid)+" ₽":"Всё ✓"}</div></div>
+    <div class="stat"><div class="stat-lbl">Не оплачено</div><div class="stat-val ${unpaidCount>0?"bad":"ok"}">${unpaidCount} поз.</div></div>`;
+}
+
+function render() {
+  document.getElementById("months").innerHTML = MONTHS.map(m =>
+    `<button class="mbtn${m===currentMonth?" active":""}" onclick="currentMonth='${m}';render()">${m}</button>`
+  ).join("");
+  updateStats();
+  document.getElementById("props").innerHTML = PROPS.map((prop, pi) => {
+    const pays = state[currentMonth][prop] || [];
+    const propTotal = pays.reduce((s,p) => s+(p.a||0), 0);
+    const isOpen = openProps.has(prop);
+    const esc = s => s.replace(/'/g,"\\'");
+    const rows = pays.map((pay, idx) => {
+      const ip = pay.p;
+      return `<div class="pay-row">
+        <div class="check${ip?" paid":""}" onclick="togglePay('${esc(currentMonth)}','${esc(prop)}',${idx})">
+          <svg class="check-icon" viewBox="0 0 14 14" fill="none">
+            <path d="M2.5 7L5.5 10L11.5 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="pay-info">
+          <div class="pay-name">${pay.n}</div>
+          ${pay.due?`<div class="pay-due${pay.over?" over":""}">⏰ до ${pay.due}</div>`:""}
+        </div>
+        <div class="amt-wrap">
+          <input class="amt-input${ip?" paid-amt":((pay.a||0)>0?" unpaid":"")}"
+            type="number" value="${pay.a||""}" placeholder="0" min="0" step="0.01"
+            onchange="updateAmount('${esc(currentMonth)}','${esc(prop)}',${idx},this.value)"
+            oninput="updateAmount('${esc(currentMonth)}','${esc(prop)}',${idx},this.value)">
+          <span class="rub">₽</span>
+        </div>
+      </div>`;
+    }).join("");
+    return `<div class="prop-block">
+      <div class="prop-hdr" onclick="toggleProp('${esc(prop)}')">
+        <div class="prop-name"><span class="prop-icon">${ICONS[pi]}</span>${prop}</div>
+        <div class="prop-right">
+          <span class="prop-total">${propTotal>0?fmt(propTotal)+" ₽":""}</span>
+          <span class="chevron${isOpen?" open":""}">▼</span>
+        </div>
+      </div>
+      <div class="pay-rows${isOpen?" open":""}">${rows}</div>
+    </div>`;
+  }).join("");
+}
+
+initState();
+render();
+</script>
+</body>
+</html>
