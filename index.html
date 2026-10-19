@@ -6,12 +6,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Оплаты">
-<title>Оплаты 2026</title>
+<title>Оплаты</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #F2F2F7; color: #1C1C1E; min-height: 100vh; }
   .header { background: #fff; padding: 16px 16px 12px; border-bottom: 0.5px solid #C6C6C8; position: sticky; top: 0; z-index: 10; }
   .header h1 { font-size: 22px; font-weight: 700; color: #1C1C1E; }
+  .hdr-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .years { display: flex; background: #E5E5EA; border-radius: 9px; padding: 2px; flex-shrink: 0; }
+  .ybtn { border: none; background: transparent; padding: 6px 14px; border-radius: 7px; font-size: 15px; font-family: inherit; color: #1C1C1E; cursor: pointer; }
+  .ybtn.active { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
   .header p { font-size: 13px; color: #8E8E93; margin-top: 2px; }
   .month-row { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: #fff; border-bottom: 0.5px solid #C6C6C8; scrollbar-width: none; }
   .month-row::-webkit-scrollbar { display: none; }
@@ -67,7 +71,10 @@
 <body>
 
 <div class="header">
-  <h1>Оплаты 2026</h1>
+  <div class="hdr-top">
+    <h1 id="title">Оплаты</h1>
+    <div class="years" id="years"></div>
+  </div>
   <p id="last-saved">Нажмите «Сохранить» после изменений</p>
 </div>
 
@@ -87,7 +94,10 @@
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwEOC2460TY0MOrdAx-se74awjx4xfiu8taIdHEdPf_zB8yq2Ze8Y2qdG2DMXN4q5nw/exec";
-const SHEET_ID = "1bqmv6K2jbAfy6SjY6CYtZ6KOs7D1zU_jJZfYE6HhpKA";
+const SHEET_ID = "1bqmv6K2jbAfy6SjY6CYtZ6KOs7D1zU_jJZfYE6HhpKA"; // 2026
+const YEARS = [2026, 2027];
+// Статьи, которые появляются с определённого года
+const FROM_YEAR = { 2027: { "Железноводск — квартира": ["Кап. ремонт"] } };
 const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const PROPS = ["Железноводск — квартира","Краснодар — квартира","Анапа — кв. 5","Анапа — кв. 4","Анапа — машиноместо"];
 const ICONS = ["🏠","🏢","🌊","🌊","🚗"];
@@ -106,18 +116,56 @@ const JULY = {
   "Анапа — машиноместо":[{n:"Машиноместо",a:900,p:false,due:"15.07"}]
 };
 
-let state = {}, currentMonth = "Июль", openProps = new Set(PROPS);
+let state = {}, currentYear = pickYear(), currentMonth = defaultMonth(), openProps = new Set(PROPS);
+
+function pickYear() {
+  const saved = Number(localStorage.getItem("payYear"));
+  if (YEARS.includes(saved)) return saved;
+  const now = new Date().getFullYear();
+  return YEARS.includes(now) ? now : YEARS[0];
+}
+
+function defaultMonth() {
+  const now = new Date();
+  return now.getFullYear() === currentYear ? MONTHS[now.getMonth()] : "Январь";
+}
+
+function tmpl(prop) {
+  let list = TEMPLATE[prop].slice();
+  Object.keys(FROM_YEAR).forEach(y => {
+    if (currentYear >= Number(y) && FROM_YEAR[y][prop]) list = list.concat(FROM_YEAR[y][prop]);
+  });
+  return list;
+}
+
+function storeKey() { return "payments" + currentYear; }
+
+function switchYear(y) {
+  if (y === currentYear) return;
+  saveLocal();
+  currentYear = y;
+  localStorage.setItem("payYear", String(y));
+  currentMonth = defaultMonth();
+  initState();
+  const btn = document.getElementById("sync-btn");
+  btn.textContent = "Сохранить"; btn.onclick = syncToSheets; btn.disabled = false;
+  const info = document.getElementById("sync-info");
+  info.className = "sync-info"; info.textContent = "Таблица " + currentYear + " года";
+  document.getElementById("last-saved").textContent = "Нажмите «Сохранить» после изменений";
+  render();
+}
 
 function initState() {
-  const saved = localStorage.getItem("payments2026");
+  state = {};
+  const saved = localStorage.getItem(storeKey());
   if (saved) {
     try { state = JSON.parse(saved); mergeTemplate(); return; } catch(e) {}
   }
   MONTHS.forEach(m => {
     state[m] = {};
     PROPS.forEach(prop => {
-      if (m === "Июль" && JULY[prop]) state[m][prop] = JULY[prop].map(d => ({n:d.n,a:d.a,p:d.p,due:d.due||"",over:d.over||false}));
-      else state[m][prop] = TEMPLATE[prop].map(n => ({n,a:0,p:false,due:"",over:false}));
+      if (currentYear === 2026 && m === "Июль" && JULY[prop]) state[m][prop] = JULY[prop].map(d => ({n:d.n,a:d.a,p:d.p,due:d.due||"",over:d.over||false}));
+      else state[m][prop] = tmpl(prop).map(n => ({n,a:0,p:false,due:"",over:false}));
     });
   });
 }
@@ -128,8 +176,9 @@ function mergeTemplate() {
     state[m] = state[m] || {};
     PROPS.forEach(prop => {
       const cur = state[m][prop] || [];
-      const out = TEMPLATE[prop].map(n => cur.find(x => x.n === n) || {n,a:0,p:false,due:"",over:false});
-      cur.forEach(x => { if (!TEMPLATE[prop].includes(x.n)) out.push(x); });
+      const t = tmpl(prop);
+      const out = t.map(n => cur.find(x => x.n === n) || {n,a:0,p:false,due:"",over:false});
+      cur.forEach(x => { if (!t.includes(x.n)) out.push(x); });
       state[m][prop] = out;
     });
   });
@@ -137,7 +186,7 @@ function mergeTemplate() {
 }
 
 function saveLocal() {
-  localStorage.setItem("payments2026", JSON.stringify(state));
+  localStorage.setItem(storeKey(), JSON.stringify(state));
 }
 
 function fmt(n) { return (n||0).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -169,7 +218,7 @@ async function syncToSheets() {
     const res = await fetch(SCRIPT_URL, {
       method: "POST",
       headers: {"Content-Type":"text/plain"},
-      body: JSON.stringify({action:"save", rows})
+      body: JSON.stringify({action:"save", year: currentYear, rows})
     });
     const result = await res.json();
     if (!result.ok) throw new Error(result.error || "Таблица не приняла данные");
@@ -180,7 +229,8 @@ async function syncToSheets() {
     showToast("Данные сохранены в таблицу");
     btn.textContent = "Открыть таблицу";
     btn.disabled = false;
-    btn.onclick = () => window.open("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit", "_blank");
+    const url = result.url || ("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit");
+    btn.onclick = () => window.open(url, "_blank");
   } catch(e) {
     info.className = "sync-info err";
     info.textContent = "НЕ сохранено в таблицу. Данные остались на телефоне — нажмите «Сохранить» ещё раз.";
@@ -228,6 +278,10 @@ function updateStats() {
 }
 
 function render() {
+  document.getElementById("title").textContent = "Оплаты " + currentYear;
+  document.getElementById("years").innerHTML = YEARS.map(y =>
+    `<button class="ybtn${y===currentYear?" active":""}" onclick="switchYear(${y})">${y}</button>`
+  ).join("");
   document.getElementById("months").innerHTML = MONTHS.map(m =>
     `<button class="mbtn${m===currentMonth?" active":""}" onclick="currentMonth='${m}';render()">${m}</button>`
   ).join("");
