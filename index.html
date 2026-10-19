@@ -93,9 +93,9 @@ const PROPS = ["Железноводск — квартира","Краснода
 const ICONS = ["🏠","🏢","🌊","🌊","🚗"];
 const TEMPLATE = {
   "Железноводск — квартира":["Газ","Вода","ТКО","Коммуналка","Свет","Интернет / ТВ"],
-  "Краснодар — квартира":["Коммуналка","Кап. ремонт","ТВ"],
+  "Краснодар — квартира":["Коммуналка","Вода","Отопление","Кап. ремонт","ТВ","Интернет"],
   "Анапа — кв. 5":["Газ","Свет","Интернет","Коммуналка","Кап. ремонт","НТВ плюс","Гараж №6"],
-  "Анапа — кв. 4":["Газ","Свет","Коммуналка","НТВ плюс","Гараж №4","Кап. ремонт"],
+  "Анапа — кв. 4":["Газ","Свет","Коммуналка","НТВ плюс","Гараж №4","Кап. ремонт","Интернет"],
   "Анапа — машиноместо":["Машиноместо"]
 };
 const JULY = {
@@ -111,7 +111,7 @@ let state = {}, currentMonth = "Июль", openProps = new Set(PROPS);
 function initState() {
   const saved = localStorage.getItem("payments2026");
   if (saved) {
-    try { state = JSON.parse(saved); return; } catch(e) {}
+    try { state = JSON.parse(saved); mergeTemplate(); return; } catch(e) {}
   }
   MONTHS.forEach(m => {
     state[m] = {};
@@ -120,6 +120,20 @@ function initState() {
       else state[m][prop] = TEMPLATE[prop].map(n => ({n,a:0,p:false,due:"",over:false}));
     });
   });
+}
+
+// Добавляет в сохранённые на телефоне данные новые статьи из TEMPLATE
+function mergeTemplate() {
+  MONTHS.forEach(m => {
+    state[m] = state[m] || {};
+    PROPS.forEach(prop => {
+      const cur = state[m][prop] || [];
+      const out = TEMPLATE[prop].map(n => cur.find(x => x.n === n) || {n,a:0,p:false,due:"",over:false});
+      cur.forEach(x => { if (!TEMPLATE[prop].includes(x.n)) out.push(x); });
+      state[m][prop] = out;
+    });
+  });
+  saveLocal();
 }
 
 function saveLocal() {
