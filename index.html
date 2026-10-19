@@ -152,11 +152,13 @@ async function syncToSheets() {
   });
 
   try {
-    await fetch(SCRIPT_URL, {
-      method: "POST", mode: "no-cors",
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
       headers: {"Content-Type":"text/plain"},
       body: JSON.stringify({action:"save", rows})
     });
+    const result = await res.json();
+    if (!result.ok) throw new Error(result.error || "Таблица не приняла данные");
     const now = new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
     info.className = "sync-info ok";
     info.textContent = "Сохранено в " + now;
@@ -167,8 +169,8 @@ async function syncToSheets() {
     btn.onclick = () => window.open("https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/edit", "_blank");
   } catch(e) {
     info.className = "sync-info err";
-    info.textContent = "Ошибка. Данные сохранены на телефоне.";
-    showToast("Нет соединения — данные сохранены локально");
+    info.textContent = "НЕ сохранено в таблицу. Данные остались на телефоне — нажмите «Сохранить» ещё раз.";
+    showToast("Не удалось сохранить в таблицу");
     btn.textContent = "Сохранить";
     btn.disabled = false;
     btn.onclick = syncToSheets;
